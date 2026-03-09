@@ -20,6 +20,11 @@ pip install -r requirements.txt
 python main.py -h
 ```
 
+Flags:
+- `-h` prints help
+- `-v` prints the current app version
+- `-u` upgrades only if a newer release is available
+
 ## Google OAuth setup
 
 1. Open Google Cloud Console.
@@ -81,6 +86,11 @@ gcal <preset> ls <count>
 gcal <preset> d <event_id>
 gcal <preset> r <event_id> "<start>" "<end>"
 ```
+
+Behavior notes:
+- Running `gcal` with no arguments prints the same help as `gcal -h`.
+- `gcal auth <client_secret_path>` completes OAuth, discovers the authorized account email, stores the token under the XDG data path, and prints the assigned preset.
+- `gcal -u` delegates to the installer and exits without reinstalling when the latest release is already installed.
 
 Examples:
 

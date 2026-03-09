@@ -7,6 +7,8 @@ APP_HOME="$HOME/.${APP}"
 INSTALL_DIR="$APP_HOME/bin"
 APP_DIR="$APP_HOME/app"
 FILENAME="${APP}-linux-x64.tar.gz"
+TARGET_RC="$HOME/.bashrc"
+PATH_SNIPPET="export PATH=\"\$HOME/.${APP}/bin:\$PATH\""
 
 MUTED='\033[0;2m'
 RED='\033[0;31m'
@@ -30,6 +32,17 @@ EOF
 
 info() { echo -e "${MUTED}$1${NC}"; }
 die() { echo -e "${RED}$1${NC}" >&2; exit 1; }
+
+ensure_path_setup() {
+  $no_modify_path && return 0
+  mkdir -p "$(dirname "$TARGET_RC")"
+  [[ -f "$TARGET_RC" ]] || touch "$TARGET_RC"
+  if grep -Fqx "$PATH_SNIPPET" "$TARGET_RC"; then
+    return 0
+  fi
+  printf '\n%s\n' "$PATH_SNIPPET" >> "$TARGET_RC"
+  info "Added ${INSTALL_DIR} to PATH in ${TARGET_RC}"
+}
 
 requested_version=${VERSION:-}
 binary_path=""
@@ -75,8 +88,14 @@ done
 _latest_version=""
 get_latest_version() {
   if [[ -z "${_latest_version}" ]]; then
-    _latest_version=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-      | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"\\n]*\)".*/\1/p')
+    if command -v gh >/dev/null 2>&1; then
+      _latest_version=$(gh release view --repo "${REPO}" --json tagName --jq '.tagName' 2>/dev/null || true)
+      _latest_version="${_latest_version#v}"
+    fi
+    if [[ -z "${_latest_version}" ]]; then
+      _latest_version=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+        | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"\\n]*\)".*/\1/p')
+    fi
     [[ -n "${_latest_version}" ]] || die "Unable to determine latest release"
   fi
   printf '%s\n' "${_latest_version}"
@@ -152,6 +171,8 @@ EOF
   chmod 755 "$INSTALL_DIR/$APP"
   installed_label="$version_label"
 fi
+
+ensure_path_setup
 
 info "Installed ${APP^^} (${installed_label:-unknown}) to $INSTALL_DIR/$APP"
 info "Run: ${APP} -h"
