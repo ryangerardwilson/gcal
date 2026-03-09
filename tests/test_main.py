@@ -39,6 +39,14 @@ class MainTests(unittest.TestCase):
             code = main(["1", "ls", "5"])
         self.assertEqual(code, 0)
 
+    def test_list_non_recurring_command(self) -> None:
+        with patch("main.load_config", return_value=self._config()), patch(
+            "gcal_cli.auth.build_calendar_service", return_value=MagicMock()
+        ), patch("gcal_cli.calendar_api.list_upcoming_events", return_value=[]) as list_mock:
+            code = main(["1", "ls", "-nr", "5"])
+        self.assertEqual(code, 0)
+        self.assertEqual(list_mock.call_args.kwargs["include_recurring"], False)
+
     def test_delete_command(self) -> None:
         with patch("main.load_config", return_value=self._config()), patch(
             "gcal_cli.auth.build_calendar_service", return_value=MagicMock()

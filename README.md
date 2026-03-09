@@ -83,6 +83,7 @@ gcal -u
 gcal auth <client_secret_path>
 gcal <preset> "<title>" "<start>" "<end>" "<invitees_csv>"
 gcal <preset> ls <count>
+gcal <preset> ls -nr <count>
 gcal <preset> d <event_id>
 gcal <preset> r <event_id> "<start>" "<end>"
 ```
@@ -91,6 +92,7 @@ Behavior notes:
 - Running `gcal` with no arguments prints the same help as `gcal -h`.
 - `gcal auth <client_secret_path>` completes OAuth, discovers the authorized account email, stores the token under the XDG data path, and prints the assigned preset.
 - During `auth`, you can enter either an IANA timezone like `Asia/Kolkata` or a raw offset like `+0530`.
+- `gcal <preset> ls -nr <count>` lists only non-recurring events.
 - `gcal -u` delegates to the installer and exits without reinstalling when the latest release is already installed.
 
 Examples:
@@ -100,6 +102,7 @@ python main.py auth ~/Documents/credentials/client_secret.json
 python main.py 1 "1:1 with Silvia" "2026-03-10 14:00:00" "2026-03-10 15:00:00" "silvia@example.com"
 python main.py 1 "Hiring screen" "2026-03-11 10:00:00" "2026-03-11 10:45:00" "a@example.com,b@example.com"
 python main.py 1 ls 5
+python main.py 1 ls -nr 5
 python main.py 1 d abc123def456
 python main.py 1 r abc123def456 "2026-03-12 11:00:00" "2026-03-12 11:45:00"
 ```

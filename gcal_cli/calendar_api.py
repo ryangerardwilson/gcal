@@ -41,6 +41,10 @@ def _event_time_payload(value: datetime, timezone: str) -> dict[str, str]:
     return payload
 
 
+def _is_recurring_event(item: dict) -> bool:
+    return bool(item.get("recurringEventId") or item.get("recurrence"))
+
+
 def create_event(service, title: str, start: datetime, end: datetime, timezone: str, invitees: list[str]) -> CalendarEvent:
     body = {
         "summary": title,
@@ -72,7 +76,7 @@ def create_event(service, title: str, start: datetime, end: datetime, timezone: 
     )
 
 
-def list_upcoming_events(service, count: int) -> list[CalendarEvent]:
+def list_upcoming_events(service, count: int, include_recurring: bool = True) -> list[CalendarEvent]:
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     try:
         payload = service.events().list(
@@ -86,6 +90,8 @@ def list_upcoming_events(service, count: int) -> list[CalendarEvent]:
         raise ApiError(f"Calendar list failed: {exc}") from exc
     events = []
     for item in payload.get("items", []) or []:
+        if not include_recurring and _is_recurring_event(item):
+            continue
         events.append(
             CalendarEvent(
                 event_id=str(item.get("id", "")),

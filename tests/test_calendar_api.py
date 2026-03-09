@@ -43,3 +43,25 @@ class CalendarApiTests(unittest.TestCase):
         self.assertEqual(kwargs["calendarId"], "primary")
         self.assertEqual(kwargs["maxResults"], 5)
         self.assertNotIn("conferenceDataVersion", kwargs)
+
+    def test_list_upcoming_events_can_exclude_recurring(self) -> None:
+        service = MagicMock()
+        service.events.return_value.list.return_value.execute.return_value = {
+            "items": [
+                {
+                    "id": "evt1",
+                    "summary": "One-off",
+                    "start": {"dateTime": "2026-03-10T14:00:00+05:30"},
+                    "end": {"dateTime": "2026-03-10T15:00:00+05:30"},
+                },
+                {
+                    "id": "evt2",
+                    "summary": "Recurring",
+                    "start": {"dateTime": "2026-03-11T14:00:00+05:30"},
+                    "end": {"dateTime": "2026-03-11T15:00:00+05:30"},
+                    "recurringEventId": "series1",
+                },
+            ]
+        }
+        events = list_upcoming_events(service, 5, include_recurring=False)
+        self.assertEqual([event.event_id for event in events], ["evt1"])

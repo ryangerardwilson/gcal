@@ -42,6 +42,7 @@ def _print_help() -> None:
         "       gcal auth <client_secret_path>",
         '       gcal <preset> "<title>" "<start>" "<end>" "<invitees_csv>"',
         "       gcal <preset> ls <count>",
+        "       gcal <preset> ls -nr <count>",
         "       gcal <preset> d <event_id>",
         '       gcal <preset> r <event_id> "<start>" "<end>"',
         "",
@@ -51,6 +52,7 @@ def _print_help() -> None:
         "  gcal auth ~/Documents/credentials/client_secret.json",
         '  gcal 1 "Interview" "2026-03-10 14:00:00" "2026-03-10 15:00:00" "a@x.com,b@y.com"',
         "  gcal 1 ls 5",
+        "  gcal 1 ls -nr 5",
         "  gcal 1 d abc123",
         '  gcal 1 r abc123 "2026-03-11 10:00:00" "2026-03-11 11:00:00"',
         "",
@@ -171,15 +173,24 @@ def main(argv: list[str] | None = None) -> int:
 
     service = build_calendar_service(account)
     if args.command == "ls":
-        if len(args.params) != 1:
-            raise UsageError("usage: gcal <preset> ls <count>")
+        include_recurring = True
+        if args.params[:1] == ["-nr"]:
+            include_recurring = False
+            params = args.params[1:]
+        else:
+            params = args.params
+        if len(params) != 1:
+            raise UsageError("usage: gcal <preset> ls <count>\n       gcal <preset> ls -nr <count>")
         try:
-            count = int(args.params[0])
+            count = int(params[0])
         except ValueError as exc:
             raise UsageError("count must be a positive integer") from exc
         if count <= 0:
             raise UsageError("count must be > 0")
-        return _print_events(list_upcoming_events(service, count), config.timezone)
+        return _print_events(
+            list_upcoming_events(service, count, include_recurring=include_recurring),
+            config.timezone,
+        )
     if args.command == "d":
         if len(args.params) != 1:
             raise UsageError("usage: gcal <preset> d <event_id>")
