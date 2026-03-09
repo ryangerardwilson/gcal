@@ -1,0 +1,11 @@
+{
+  "accounts": {
+    "1": {
+      "email": "you@example.com",
+      "client_secret_file": "/home/you/Documents/credentials/client_secret.json"
+    }
+  },
+  "defaults": {
+    "timezone": "Asia/Kolkata"
+  }
+}
