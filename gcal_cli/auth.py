@@ -63,5 +63,7 @@ def load_credentials(account: AccountConfig):
 
 
 def build_calendar_service(account: AccountConfig):
+    from googleapiclient.discovery import build
+
     credentials = load_credentials(account)
     return build("calendar", "v3", credentials=credentials, cache_discovery=False)
