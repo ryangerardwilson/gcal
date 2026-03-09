@@ -10,6 +10,7 @@ from .paths import ensure_dirs
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/userinfo.email",
+    "openid",
 ]
 
 
