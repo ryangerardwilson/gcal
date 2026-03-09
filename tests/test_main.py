@@ -1,4 +1,5 @@
 import unittest
+from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -88,3 +89,13 @@ class MainTests(unittest.TestCase):
             code = main(["auth", "/tmp/client.json"])
         self.assertEqual(code, 0)
         self.assertEqual(upsert_mock.call_args.args[2], "+05:30")
+
+    def test_help_is_human_friendly(self) -> None:
+        with patch("sys.stdout", new=StringIO()) as stdout:
+            code = main(["-h"])
+        self.assertEqual(code, 0)
+        output = stdout.getvalue()
+        self.assertIn("Google Calendar event CLI", output)
+        self.assertIn("create an event, invite attendees, and request a Google Meet link", output)
+        self.assertIn("gcal 1 ls -nr 5", output)
+        self.assertNotIn("usage:", output)
