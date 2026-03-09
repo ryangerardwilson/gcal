@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from .config import timezone_info
@@ -73,7 +73,7 @@ def create_event(service, title: str, start: datetime, end: datetime, timezone: 
 
 
 def list_upcoming_events(service, count: int) -> list[CalendarEvent]:
-    now = datetime.utcnow().isoformat() + "Z"
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     try:
         payload = service.events().list(
             calendarId="primary",
@@ -81,7 +81,6 @@ def list_upcoming_events(service, count: int) -> list[CalendarEvent]:
             maxResults=count,
             singleEvents=True,
             orderBy="startTime",
-            conferenceDataVersion=1,
         ).execute()
     except HttpError as exc:
         raise ApiError(f"Calendar list failed: {exc}") from exc

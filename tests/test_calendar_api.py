@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from gcal_cli.calendar_api import create_event, extract_meeting_url
+from gcal_cli.calendar_api import create_event, extract_meeting_url, list_upcoming_events
 
 
 class CalendarApiTests(unittest.TestCase):
@@ -33,3 +33,13 @@ class CalendarApiTests(unittest.TestCase):
         self.assertEqual(kwargs["conferenceDataVersion"], 1)
         self.assertEqual(kwargs["sendUpdates"], "all")
         self.assertEqual(len(kwargs["body"]["attendees"]), 2)
+
+    def test_list_upcoming_events_does_not_pass_conference_data_version(self) -> None:
+        service = MagicMock()
+        service.events.return_value.list.return_value.execute.return_value = {"items": []}
+        events = list_upcoming_events(service, 5)
+        self.assertEqual(events, [])
+        kwargs = service.events.return_value.list.call_args.kwargs
+        self.assertEqual(kwargs["calendarId"], "primary")
+        self.assertEqual(kwargs["maxResults"], 5)
+        self.assertNotIn("conferenceDataVersion", kwargs)
