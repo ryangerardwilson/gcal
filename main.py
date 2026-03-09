@@ -125,15 +125,18 @@ def _print_events(events, timezone: str) -> int:
         print("no events")
         return 0
     sections: list[str] = []
-    label_width = len("event_id")
+    labels = ("event_id", "title", "time", "attendees")
+    label_width = max(len(label) for label in labels)
     use_color = sys.stdout.isatty() and "NO_COLOR" not in os.environ
     for index, event in enumerate(events, start=1):
         prefix = f"[{index}]"
         header = prefix + ("-" * max(1, 79 - len(prefix)))
+        attendees = ",".join(event.attendees) if event.attendees else "-"
         lines = [
             f"{'event_id':<{label_width}} : {event.event_id}",
-            f"{'title':<{label_width}}    : {event.title}",
-            f"{'time':<{label_width}}     : {_format_event_time(event.start, event.end, timezone)}",
+            f"{'title':<{label_width}} : {event.title}",
+            f"{'time':<{label_width}} : {_format_event_time(event.start, event.end, timezone)}",
+            f"{'attendees':<{label_width}} : {attendees}",
             event.meeting_url,
         ]
         if use_color:

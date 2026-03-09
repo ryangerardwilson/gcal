@@ -19,6 +19,7 @@ class CalendarEvent:
     title: str
     start: str
     end: str
+    attendees: list[str]
     meeting_url: str
 
 
@@ -32,6 +33,15 @@ def extract_meeting_url(event: dict) -> str:
             if str(entry.get("entryPointType", "")).strip() == "video":
                 return str(entry.get("uri", "")).strip()
     return "-"
+
+
+def extract_attendees(event: dict) -> list[str]:
+    attendees = []
+    for entry in event.get("attendees", []) or []:
+        email = str(entry.get("email", "")).strip()
+        if email:
+            attendees.append(email)
+    return attendees
 
 
 def _event_time_payload(value: datetime, timezone: str) -> dict[str, str]:
@@ -72,6 +82,7 @@ def create_event(service, title: str, start: datetime, end: datetime, timezone: 
         title=str(event.get("summary", "")),
         start=str(event.get("start", {}).get("dateTime", "")),
         end=str(event.get("end", {}).get("dateTime", "")),
+        attendees=extract_attendees(event),
         meeting_url=extract_meeting_url(event),
     )
 
@@ -98,6 +109,7 @@ def list_upcoming_events(service, count: int, include_recurring: bool = True) ->
                 title=str(item.get("summary", "(untitled)")),
                 start=str(item.get("start", {}).get("dateTime") or item.get("start", {}).get("date", "")),
                 end=str(item.get("end", {}).get("dateTime") or item.get("end", {}).get("date", "")),
+                attendees=extract_attendees(item),
                 meeting_url=extract_meeting_url(item),
             )
         )
@@ -135,5 +147,6 @@ def reschedule_event(service, event_id: str, start: datetime, end: datetime, tim
         title=str(event.get("summary", "")),
         start=str(event.get("start", {}).get("dateTime", "")),
         end=str(event.get("end", {}).get("dateTime", "")),
+        attendees=extract_attendees(event),
         meeting_url=extract_meeting_url(event),
     )

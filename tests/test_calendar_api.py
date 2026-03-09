@@ -1,13 +1,17 @@
 import unittest
 from unittest.mock import MagicMock
 
-from gcal_cli.calendar_api import create_event, extract_meeting_url, list_upcoming_events
+from gcal_cli.calendar_api import create_event, extract_attendees, extract_meeting_url, list_upcoming_events
 
 
 class CalendarApiTests(unittest.TestCase):
     def test_extract_meeting_url_prefers_hangout_link(self) -> None:
         event = {"hangoutLink": "https://meet.google.com/abc-defg-hij"}
         self.assertEqual(extract_meeting_url(event), "https://meet.google.com/abc-defg-hij")
+
+    def test_extract_attendees_returns_email_ids(self) -> None:
+        event = {"attendees": [{"email": "a@example.com"}, {"email": "b@example.com"}]}
+        self.assertEqual(extract_attendees(event), ["a@example.com", "b@example.com"])
 
     def test_create_event_requests_meet_and_send_updates(self) -> None:
         service = MagicMock()
@@ -17,6 +21,7 @@ class CalendarApiTests(unittest.TestCase):
             "summary": "Interview",
             "start": {"dateTime": "2026-03-10T14:00:00+05:30"},
             "end": {"dateTime": "2026-03-10T15:00:00+05:30"},
+            "attendees": [{"email": "a@example.com"}, {"email": "b@example.com"}],
             "hangoutLink": "https://meet.google.com/abc-defg-hij",
         }
         event = create_event(
@@ -28,6 +33,7 @@ class CalendarApiTests(unittest.TestCase):
             ["a@example.com", "b@example.com"],
         )
         self.assertEqual(event.event_id, "evt1")
+        self.assertEqual(event.attendees, ["a@example.com", "b@example.com"])
         kwargs = service.events.return_value.insert.call_args.kwargs
         self.assertEqual(kwargs["calendarId"], "primary")
         self.assertEqual(kwargs["conferenceDataVersion"], 1)
@@ -53,15 +59,18 @@ class CalendarApiTests(unittest.TestCase):
                     "summary": "One-off",
                     "start": {"dateTime": "2026-03-10T14:00:00+05:30"},
                     "end": {"dateTime": "2026-03-10T15:00:00+05:30"},
+                    "attendees": [{"email": "solo@example.com"}],
                 },
                 {
                     "id": "evt2",
                     "summary": "Recurring",
                     "start": {"dateTime": "2026-03-11T14:00:00+05:30"},
                     "end": {"dateTime": "2026-03-11T15:00:00+05:30"},
+                    "attendees": [{"email": "series@example.com"}],
                     "recurringEventId": "series1",
                 },
             ]
         }
         events = list_upcoming_events(service, 5, include_recurring=False)
         self.assertEqual([event.event_id for event in events], ["evt1"])
+        self.assertEqual(events[0].attendees, ["solo@example.com"])
