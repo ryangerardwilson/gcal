@@ -11,7 +11,7 @@ import tempfile
 from zoneinfo import ZoneInfo
 
 from _version import __version__
-from gcal_cli.config import get_account, load_config, upsert_authenticated_account, validate_timezone
+from gcal_cli.config import get_account, load_config, timezone_info, upsert_authenticated_account, validate_timezone
 from gcal_cli.errors import ApiError, ConfigError, GcalError, UsageError
 
 ANSI_RESET = "\033[0m"
@@ -67,7 +67,7 @@ def _parse_time(value: str, timezone: str) -> datetime:
         naive = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
     except ValueError as exc:
         raise UsageError("time must use YYYY-MM-DD HH:MM:SS") from exc
-    return naive.replace(tzinfo=ZoneInfo(timezone))
+    return naive.replace(tzinfo=timezone_info(timezone))
 
 
 def _parse_invitees(value: str) -> list[str]:
@@ -78,8 +78,9 @@ def _parse_invitees(value: str) -> list[str]:
 
 
 def _format_event_time(start_iso: str, end_iso: str, timezone: str) -> str:
-    start = datetime.fromisoformat(start_iso).astimezone(ZoneInfo(timezone))
-    end = datetime.fromisoformat(end_iso).astimezone(ZoneInfo(timezone))
+    tzinfo = timezone_info(timezone)
+    start = datetime.fromisoformat(start_iso).astimezone(tzinfo)
+    end = datetime.fromisoformat(end_iso).astimezone(tzinfo)
     return f"{start.strftime('%Y-%m-%d %H:%M:%S')} -> {end.strftime('%Y-%m-%d %H:%M:%S')}"
 
 
@@ -91,7 +92,7 @@ def _handle_auth(params: list[str]) -> int:
     client_secret = Path(params[0]).expanduser()
     if not client_secret.exists() or not client_secret.is_file():
         raise UsageError(f"missing client secret file: {client_secret}")
-    timezone_value = input("Timezone [UTC]: ").strip() or "UTC"
+    timezone_value = input("Timezone [UTC, +0530, -0430]: ").strip() or "UTC"
     timezone = validate_timezone(timezone_value, Path("<prompt>"))
     authorized = authorize_account(client_secret)
     account = upsert_authenticated_account(client_secret, authorized.email, timezone)

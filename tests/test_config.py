@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from gcal_cli.config import load_config, token_file_for_email, validate_timezone
+from gcal_cli.config import load_config, timezone_info, token_file_for_email, validate_timezone
 from gcal_cli.errors import ConfigError
 
 
@@ -15,6 +15,12 @@ class ConfigTests(unittest.TestCase):
     def test_validate_timezone_rejects_unknown(self) -> None:
         with self.assertRaises(ConfigError):
             validate_timezone("Mars/Base", Path("/tmp/config.json"))
+
+    def test_validate_timezone_accepts_utc_offset(self) -> None:
+        self.assertEqual(validate_timezone("+0530", Path("/tmp/config.json")), "+05:30")
+
+    def test_timezone_info_supports_utc_offset(self) -> None:
+        self.assertEqual(timezone_info("+05:30").utcoffset(None).total_seconds(), 19800)
 
     def test_token_file_for_email_uses_xdg_data_home(self) -> None:
         with patch.dict(os.environ, {"XDG_DATA_HOME": "/tmp/xdg-data"}, clear=False):

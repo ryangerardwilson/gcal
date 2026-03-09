@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import timedelta, timezone as dt_timezone, tzinfo
 from pathlib import Path
+import re
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -36,17 +38,47 @@ def resolve_config_path() -> Path:
     return config_file()
 
 
+OFFSET_PATTERN = re.compile(r"^([+-])(\d{2}):?(\d{2})$")
+
+
+def normalize_timezone(value: str) -> str:
+    stripped = value.strip()
+    match = OFFSET_PATTERN.fullmatch(stripped)
+    if not match:
+        return stripped
+    sign, hours_raw, minutes_raw = match.groups()
+    hours = int(hours_raw)
+    minutes = int(minutes_raw)
+    if hours > 23 or minutes > 59:
+        raise ValueError("offset out of range")
+    return f"{sign}{hours_raw}:{minutes_raw}"
+
+
+def timezone_info(value: str) -> tzinfo:
+    normalized = normalize_timezone(value)
+    match = OFFSET_PATTERN.fullmatch(normalized)
+    if match:
+        sign, hours_raw, minutes_raw = match.groups()
+        offset = timedelta(hours=int(hours_raw), minutes=int(minutes_raw))
+        if sign == "-":
+            offset = -offset
+        return dt_timezone(offset)
+    return ZoneInfo(normalized)
+
+
 def validate_timezone(value: Any, config_path: Path) -> str:
     if value is None:
         return "UTC"
     if not isinstance(value, str) or not value.strip():
-        raise ConfigError(f"Invalid config at {config_path}: defaults.timezone must be a non-empty IANA timezone")
-    timezone = value.strip()
-    try:
-        ZoneInfo(timezone)
-    except ZoneInfoNotFoundError as exc:
         raise ConfigError(
-            f"Invalid config at {config_path}: defaults.timezone must be a valid IANA timezone like 'Asia/Kolkata'"
+            f"Invalid config at {config_path}: defaults.timezone must be a non-empty IANA timezone or UTC offset"
+        )
+    try:
+        timezone = normalize_timezone(value)
+        timezone_info(timezone)
+    except (ValueError, ZoneInfoNotFoundError) as exc:
+        raise ConfigError(
+            f"Invalid config at {config_path}: defaults.timezone must be a valid IANA timezone like 'Asia/Kolkata' or UTC offset like '+05:30'"
         ) from exc
     return timezone
 

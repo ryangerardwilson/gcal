@@ -69,7 +69,7 @@ Example config:
 ```
 
 Notes:
-- `defaults.timezone` must be an IANA timezone string like `Asia/Kolkata` or `America/Los_Angeles`.
+- `defaults.timezone` may be an IANA timezone string like `Asia/Kolkata` or a UTC offset like `+05:30`.
 - CLI timestamps are interpreted in that configured timezone.
 - Event creation requests a Google Meet link and sends attendee invites by email.
 
@@ -90,6 +90,7 @@ gcal <preset> r <event_id> "<start>" "<end>"
 Behavior notes:
 - Running `gcal` with no arguments prints the same help as `gcal -h`.
 - `gcal auth <client_secret_path>` completes OAuth, discovers the authorized account email, stores the token under the XDG data path, and prints the assigned preset.
+- During `auth`, you can enter either an IANA timezone like `Asia/Kolkata` or a raw offset like `+0530`.
 - `gcal -u` delegates to the installer and exits without reinstalling when the latest release is already installed.
 
 Examples:

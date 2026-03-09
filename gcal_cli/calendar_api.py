@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import uuid4
 
+from .config import timezone_info
 from .errors import ApiError
 
 try:
@@ -33,11 +34,18 @@ def extract_meeting_url(event: dict) -> str:
     return "-"
 
 
+def _event_time_payload(value: datetime, timezone: str) -> dict[str, str]:
+    payload = {"dateTime": value.isoformat()}
+    if "/" in timezone:
+        payload["timeZone"] = timezone
+    return payload
+
+
 def create_event(service, title: str, start: datetime, end: datetime, timezone: str, invitees: list[str]) -> CalendarEvent:
     body = {
         "summary": title,
-        "start": {"dateTime": start.isoformat(), "timeZone": timezone},
-        "end": {"dateTime": end.isoformat(), "timeZone": timezone},
+        "start": _event_time_payload(start, timezone),
+        "end": _event_time_payload(end, timezone),
         "attendees": [{"email": email} for email in invitees],
         "conferenceData": {
             "createRequest": {
@@ -104,8 +112,8 @@ def delete_event(service, event_id: str) -> None:
 
 def reschedule_event(service, event_id: str, start: datetime, end: datetime, timezone: str) -> CalendarEvent:
     body = {
-        "start": {"dateTime": start.isoformat(), "timeZone": timezone},
-        "end": {"dateTime": end.isoformat(), "timeZone": timezone},
+        "start": _event_time_payload(start, timezone),
+        "end": _event_time_payload(end, timezone),
     }
     try:
         event = service.events().patch(

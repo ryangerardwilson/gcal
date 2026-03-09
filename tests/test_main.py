@@ -63,3 +63,20 @@ class MainTests(unittest.TestCase):
             "gcal_cli.auth.build_calendar_service", return_value=MagicMock()
         ), self.assertRaises(UsageError):
             main(["1", "ls"])
+
+    def test_auth_prompt_accepts_utc_offset(self) -> None:
+        authorized = MagicMock()
+        authorized.email = "user@example.com"
+        account = MagicMock()
+        account.preset = "1"
+        account.email = "user@example.com"
+        with patch("main.input", return_value="+0530"), patch(
+            "main.Path.exists", return_value=True
+        ), patch("main.Path.is_file", return_value=True), patch(
+            "gcal_cli.auth.authorize_account", return_value=authorized
+        ), patch(
+            "main.upsert_authenticated_account", return_value=account
+        ) as upsert_mock:
+            code = main(["auth", "/tmp/client.json"])
+        self.assertEqual(code, 0)
+        self.assertEqual(upsert_mock.call_args.args[2], "+05:30")
