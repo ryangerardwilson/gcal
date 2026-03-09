@@ -70,11 +70,14 @@ jobs:
               tar -C dist -czf gcal-linux-x64.tar.gz gcal
             '
 
+          ls -lah "${GITHUB_WORKSPACE}"
+          test -f "${GITHUB_WORKSPACE}/gcal-linux-x64.tar.gz"
+
       - name: Create release and upload asset
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG }}
           files: |
-            gcal-linux-x64.tar.gz
+            ${{ github.workspace }}/gcal-linux-x64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
