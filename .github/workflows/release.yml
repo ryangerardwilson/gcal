@@ -61,7 +61,7 @@ jobs:
               "$PYBIN" -m pip install --force-reinstall --no-binary=charset-normalizer charset-normalizer
               "$PYBIN" -m pip install --only-binary=:all: pyinstaller
 
-              printf "__version__ = \"%s\"\\n" "${VERSION}" > _version.py
+              sed -i -E "s/^__version__ = \".*\"/__version__ = \"${VERSION}\"/" _version.py
 
               "$PYBIN" -m PyInstaller --clean --onedir --name gcal \
                 --collect-all charset_normalizer \
