@@ -12,8 +12,14 @@ import tempfile
 from zoneinfo import ZoneInfo
 
 from _version import __version__
-from gcal_cli.paths import config_path
-from gcal_cli.config import get_account, load_config, timezone_info, upsert_authenticated_account, validate_timezone
+from gcal_cli.config import (
+    get_account,
+    load_config,
+    resolve_config_path,
+    timezone_info,
+    upsert_authenticated_account,
+    validate_timezone,
+)
 from gcal_cli.errors import ApiError, ConfigError, GcalError, UsageError
 
 ANSI_RESET = "\033[0m"
@@ -130,7 +136,7 @@ def _upgrade_to_latest() -> int:
 
 
 def _open_config_in_editor() -> int:
-    cfg_path = config_path()
+    cfg_path = resolve_config_path()
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
     if not cfg_path.exists():
         cfg_path.write_text('{"defaults":{"timezone":"UTC"},"accounts":{}}\n', encoding="utf-8")
