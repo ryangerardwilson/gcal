@@ -5,12 +5,14 @@ from datetime import datetime
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
 from zoneinfo import ZoneInfo
 
 from _version import __version__
+from gcal_cli.paths import config_path
 from gcal_cli.config import get_account, load_config, timezone_info, upsert_authenticated_account, validate_timezone
 from gcal_cli.errors import ApiError, ConfigError, GcalError, UsageError
 
@@ -46,6 +48,8 @@ def _print_help() -> None:
         "    print the installed version",
         "  gcal -u",
         "    upgrade to the latest release",
+        "  gcal conf",
+        "    open the config in your editor",
         "",
         "features:",
         "  authorize a Google account and save or refresh its preset",
@@ -125,6 +129,18 @@ def _upgrade_to_latest() -> int:
         tmp_path.unlink(missing_ok=True)
 
 
+def _open_config_in_editor() -> int:
+    cfg_path = config_path()
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    if not cfg_path.exists():
+        cfg_path.write_text('{"defaults":{"timezone":"UTC"},"accounts":{}}\n', encoding="utf-8")
+    editor = (os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim").strip()
+    editor_cmd = shlex.split(editor) if editor else ["vim"]
+    if not editor_cmd:
+        editor_cmd = ["vim"]
+    return subprocess.run([*editor_cmd, str(cfg_path)], check=False).returncode
+
+
 def _print_events(events, timezone: str) -> int:
     if not events:
         print("no events")
@@ -168,6 +184,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.preset or args.command or args.params:
             raise UsageError("usage: gcal -u")
         return _upgrade_to_latest()
+    if args.preset == "conf":
+        if args.command or args.params:
+            raise UsageError("usage: gcal conf")
+        return _open_config_in_editor()
     if args.preset == "auth":
         if args.command is None or args.params:
             raise UsageError("usage: gcal auth <client_secret_path>")
