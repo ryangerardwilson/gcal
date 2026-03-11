@@ -25,6 +25,10 @@ Flags:
 - `-v` prints the current app version
 - `-u` upgrades only if a newer release is available
 
+`gcal -v` prints the installed app version from `_version.py`. Source
+checkouts keep the checked-in placeholder at `0.0.0`; tagged release builds
+stamp the shipped artifact with the real version.
+
 ## Google OAuth setup
 
 1. Open Google Cloud Console.

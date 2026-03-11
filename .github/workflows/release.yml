@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set version env
         run: |
@@ -74,10 +74,10 @@ jobs:
           test -f "${GITHUB_WORKSPACE}/gcal-linux-x64.tar.gz"
 
       - name: Create release and upload asset
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ env.TAG }}
-          files: |
-            ${{ github.workspace }}/gcal-linux-x64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${TAG}" "${GITHUB_WORKSPACE}/gcal-linux-x64.tar.gz" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "${TAG}" \
+            --generate-notes
