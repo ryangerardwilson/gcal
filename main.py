@@ -66,10 +66,11 @@ def _print_help() -> None:
         '  # <preset> "<title>" "<start>" "<end>" "<invitees_csv>"',
         '  gcal 1 "Interview" "2026-03-10 14:00:00" "2026-03-10 15:00:00" "a@x.com,b@y.com"',
         "",
-        "  list upcoming events, or only one-off events",
-        "  # <preset> ls <number_of_events_to_list> | ls -nr <number_of_non_recurring_events_to_list> | ls -h <number_of_historic_events_to_list>",
+        "  list non-recurring events by default, or switch to all / recurring-only",
+        "  # <preset> ls <count> | ls -a <count> | ls -r <count> | ls -h <count>",
         "  gcal 1 ls 5",
-        "  gcal 1 ls -nr 5",
+        "  gcal 1 ls -a 5",
+        "  gcal 1 ls -r 5",
         "  gcal 1 ls -h 5",
         "",
         "  export a transcript attachment for a past Google Meet event",
@@ -109,7 +110,7 @@ def _format_event_time(start_iso: str, end_iso: str, timezone: str) -> str:
 
 
 def _handle_auth(params: list[str]) -> int:
-    from gcal_cli.auth import authorize_account
+    from gcal_cli.auth import CALENDAR_SCOPES, authorize_account
 
     if len(params) != 1:
         raise UsageError("usage: gcal auth <client_secret_path>")
@@ -118,7 +119,7 @@ def _handle_auth(params: list[str]) -> int:
         raise UsageError(f"missing client secret file: {client_secret}")
     timezone_value = input("Timezone [UTC, +0530, -0430]: ").strip() or "UTC"
     timezone = validate_timezone(timezone_value, Path("<prompt>"))
-    authorized = authorize_account(client_secret)
+    authorized = authorize_account(client_secret, CALENDAR_SCOPES)
     account = upsert_authenticated_account(client_secret, authorized.email, timezone)
     print(f"authorized\t{account.preset}\t{account.email}\t{timezone}")
     return 0
@@ -180,30 +181,37 @@ def _print_events(events, timezone: str) -> int:
     return 0
 
 
-def _parse_ls_params(params: list[str]) -> tuple[int, bool, bool]:
-    include_recurring = True
+def _parse_ls_params(params: list[str]) -> tuple[int, str, bool]:
+    recurrence_mode = "non_recurring"
     historical = False
     remaining = list(params)
     while remaining and remaining[0].startswith("-"):
         flag = remaining.pop(0)
-        if flag == "-nr":
-            include_recurring = False
+        if flag == "-a":
+            recurrence_mode = "all"
+            continue
+        if flag == "-r":
+            recurrence_mode = "recurring"
             continue
         if flag == "-h":
             historical = True
             continue
         raise UsageError(
             "usage: gcal <preset> ls <count>\n"
-            "       gcal <preset> ls -nr <count>\n"
+            "       gcal <preset> ls -a <count>\n"
+            "       gcal <preset> ls -r <count>\n"
             "       gcal <preset> ls -h <count>\n"
-            "       gcal <preset> ls -h -nr <count>"
+            "       gcal <preset> ls -h -a <count>\n"
+            "       gcal <preset> ls -h -r <count>"
         )
     if len(remaining) != 1:
         raise UsageError(
             "usage: gcal <preset> ls <count>\n"
-            "       gcal <preset> ls -nr <count>\n"
+            "       gcal <preset> ls -a <count>\n"
+            "       gcal <preset> ls -r <count>\n"
             "       gcal <preset> ls -h <count>\n"
-            "       gcal <preset> ls -h -nr <count>"
+            "       gcal <preset> ls -h -a <count>\n"
+            "       gcal <preset> ls -h -r <count>"
         )
     try:
         count = int(remaining[0])
@@ -211,7 +219,7 @@ def _parse_ls_params(params: list[str]) -> tuple[int, bool, bool]:
         raise UsageError("count must be a positive integer") from exc
     if count <= 0:
         raise UsageError("count must be > 0")
-    return count, include_recurring, historical
+    return count, recurrence_mode, historical
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -248,11 +256,11 @@ def main(argv: list[str] | None = None) -> int:
 
     service = build_calendar_service(account)
     if args.command == "ls":
-        count, include_recurring, historical = _parse_ls_params(args.params)
+        count, recurrence_mode, historical = _parse_ls_params(args.params)
         events = (
-            list_historical_events(service, count, include_recurring=include_recurring)
+            list_historical_events(service, count, recurrence_mode=recurrence_mode)
             if historical
-            else list_upcoming_events(service, count, include_recurring=include_recurring)
+            else list_upcoming_events(service, count, recurrence_mode=recurrence_mode)
         )
         return _print_events(
             events,

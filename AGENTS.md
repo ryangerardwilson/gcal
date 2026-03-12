@@ -20,6 +20,8 @@ Implement a small multi-preset Google Calendar CLI for creating, listing, deleti
 - Preset-scoped commands:
   - `python main.py <preset> "<title>" "<start>" "<end>" "<invitees_csv>"`
   - `python main.py <preset> ls <count>`
+  - `python main.py <preset> ls -a <count>`
+  - `python main.py <preset> ls -r <count>`
   - `python main.py <preset> ls -h <count>`
   - `python main.py <preset> d <event_id>`
   - `python main.py <preset> r <event_id> "<start>" "<end>"`
@@ -46,8 +48,10 @@ Implement a small multi-preset Google Calendar CLI for creating, listing, deleti
 ## Done when
 - A user can auth one or more presets.
 - A user can create an event with attendees and receive a Meet link.
-- `ls` shows upcoming events with event id, time, and Meet URL.
-- `ls -h` shows recent past events in chronological order.
+- `ls` shows upcoming non-recurring events with event id, time, and Meet URL.
+- `ls -a` shows all upcoming events.
+- `ls -r` shows upcoming recurring events only.
+- `ls -h` shows recent past events in chronological order, with the same recurrence filter defaults.
 - A user can export an event transcript when Google has attached one to the event and the account can access it.
 - A user can delete and reschedule an event by event id.
 - Config and token paths are XDG-compliant.

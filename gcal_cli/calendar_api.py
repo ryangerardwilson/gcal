@@ -67,6 +67,15 @@ def _is_recurring_event(item: dict) -> bool:
     return bool(item.get("recurringEventId") or item.get("recurrence"))
 
 
+def _matches_recurrence_filter(item: dict, recurrence_mode: str) -> bool:
+    is_recurring = _is_recurring_event(item)
+    if recurrence_mode == "all":
+        return True
+    if recurrence_mode == "recurring":
+        return is_recurring
+    return not is_recurring
+
+
 def create_event(service, title: str, start: datetime, end: datetime, timezone: str, invitees: list[str]) -> CalendarEvent:
     body = {
         "summary": title,
@@ -99,7 +108,7 @@ def create_event(service, title: str, start: datetime, end: datetime, timezone: 
     )
 
 
-def list_upcoming_events(service, count: int, include_recurring: bool = True) -> list[CalendarEvent]:
+def list_upcoming_events(service, count: int, recurrence_mode: str = "non_recurring") -> list[CalendarEvent]:
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     try:
         payload = service.events().list(
@@ -113,13 +122,13 @@ def list_upcoming_events(service, count: int, include_recurring: bool = True) ->
         raise ApiError(f"Calendar list failed: {exc}") from exc
     events = []
     for item in payload.get("items", []) or []:
-        if not include_recurring and _is_recurring_event(item):
+        if not _matches_recurrence_filter(item, recurrence_mode):
             continue
         events.append(_calendar_event_from_item(item))
     return events
 
 
-def list_historical_events(service, count: int, include_recurring: bool = True) -> list[CalendarEvent]:
+def list_historical_events(service, count: int, recurrence_mode: str = "non_recurring") -> list[CalendarEvent]:
     now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     events: deque[CalendarEvent] = deque(maxlen=count)
     page_token = None
@@ -136,7 +145,7 @@ def list_historical_events(service, count: int, include_recurring: bool = True) 
         except HttpError as exc:
             raise ApiError(f"Calendar history failed: {exc}") from exc
         for item in payload.get("items", []) or []:
-            if not include_recurring and _is_recurring_event(item):
+            if not _matches_recurrence_filter(item, recurrence_mode):
                 continue
             events.append(_calendar_event_from_item(item))
         page_token = payload.get("nextPageToken")

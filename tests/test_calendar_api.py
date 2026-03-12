@@ -50,7 +50,7 @@ class CalendarApiTests(unittest.TestCase):
         self.assertEqual(kwargs["maxResults"], 5)
         self.assertNotIn("conferenceDataVersion", kwargs)
 
-    def test_list_upcoming_events_can_exclude_recurring(self) -> None:
+    def test_list_upcoming_events_defaults_to_non_recurring(self) -> None:
         service = MagicMock()
         service.events.return_value.list.return_value.execute.return_value = {
             "items": [
@@ -71,9 +71,31 @@ class CalendarApiTests(unittest.TestCase):
                 },
             ]
         }
-        events = list_upcoming_events(service, 5, include_recurring=False)
+        events = list_upcoming_events(service, 5)
         self.assertEqual([event.event_id for event in events], ["evt1"])
         self.assertEqual(events[0].attendees, ["solo@example.com"])
+
+    def test_list_upcoming_events_can_include_all(self) -> None:
+        service = MagicMock()
+        service.events.return_value.list.return_value.execute.return_value = {
+            "items": [
+                {"id": "evt1", "summary": "One-off", "start": {"dateTime": "2026-03-10T14:00:00+05:30"}, "end": {"dateTime": "2026-03-10T15:00:00+05:30"}},
+                {"id": "evt2", "summary": "Recurring", "start": {"dateTime": "2026-03-11T14:00:00+05:30"}, "end": {"dateTime": "2026-03-11T15:00:00+05:30"}, "recurringEventId": "series1"},
+            ]
+        }
+        events = list_upcoming_events(service, 5, recurrence_mode="all")
+        self.assertEqual([event.event_id for event in events], ["evt1", "evt2"])
+
+    def test_list_upcoming_events_can_filter_recurring_only(self) -> None:
+        service = MagicMock()
+        service.events.return_value.list.return_value.execute.return_value = {
+            "items": [
+                {"id": "evt1", "summary": "One-off", "start": {"dateTime": "2026-03-10T14:00:00+05:30"}, "end": {"dateTime": "2026-03-10T15:00:00+05:30"}},
+                {"id": "evt2", "summary": "Recurring", "start": {"dateTime": "2026-03-11T14:00:00+05:30"}, "end": {"dateTime": "2026-03-11T15:00:00+05:30"}, "recurringEventId": "series1"},
+            ]
+        }
+        events = list_upcoming_events(service, 5, recurrence_mode="recurring")
+        self.assertEqual([event.event_id for event in events], ["evt2"])
 
     def test_list_historical_events_keeps_most_recent_tail_in_ascending_order(self) -> None:
         service = MagicMock()

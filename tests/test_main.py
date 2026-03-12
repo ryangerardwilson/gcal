@@ -36,17 +36,26 @@ class MainTests(unittest.TestCase):
     def test_list_command(self) -> None:
         with patch("main.load_config", return_value=self._config()), patch(
             "gcal_cli.auth.build_calendar_service", return_value=MagicMock()
-        ), patch("gcal_cli.calendar_api.list_upcoming_events", return_value=[]):
+        ), patch("gcal_cli.calendar_api.list_upcoming_events", return_value=[]) as list_mock:
             code = main(["1", "ls", "5"])
         self.assertEqual(code, 0)
+        self.assertEqual(list_mock.call_args.kwargs["recurrence_mode"], "non_recurring")
 
-    def test_list_non_recurring_command(self) -> None:
+    def test_list_all_command(self) -> None:
         with patch("main.load_config", return_value=self._config()), patch(
             "gcal_cli.auth.build_calendar_service", return_value=MagicMock()
         ), patch("gcal_cli.calendar_api.list_upcoming_events", return_value=[]) as list_mock:
-            code = main(["1", "ls", "-nr", "5"])
+            code = main(["1", "ls", "-a", "5"])
         self.assertEqual(code, 0)
-        self.assertEqual(list_mock.call_args.kwargs["include_recurring"], False)
+        self.assertEqual(list_mock.call_args.kwargs["recurrence_mode"], "all")
+
+    def test_list_recurring_command(self) -> None:
+        with patch("main.load_config", return_value=self._config()), patch(
+            "gcal_cli.auth.build_calendar_service", return_value=MagicMock()
+        ), patch("gcal_cli.calendar_api.list_upcoming_events", return_value=[]) as list_mock:
+            code = main(["1", "ls", "-r", "5"])
+        self.assertEqual(code, 0)
+        self.assertEqual(list_mock.call_args.kwargs["recurrence_mode"], "recurring")
 
     def test_list_history_command(self) -> None:
         with patch("main.load_config", return_value=self._config()), patch(
@@ -54,7 +63,7 @@ class MainTests(unittest.TestCase):
         ), patch("gcal_cli.calendar_api.list_historical_events", return_value=[]) as list_mock:
             code = main(["1", "ls", "-h", "5"])
         self.assertEqual(code, 0)
-        list_mock.assert_called_once_with(unittest.mock.ANY, 5, include_recurring=True)
+        list_mock.assert_called_once_with(unittest.mock.ANY, 5, recurrence_mode="non_recurring")
 
     def test_delete_command(self) -> None:
         with patch("main.load_config", return_value=self._config()), patch(
@@ -110,11 +119,12 @@ class MainTests(unittest.TestCase):
             "main.Path.exists", return_value=True
         ), patch("main.Path.is_file", return_value=True), patch(
             "gcal_cli.auth.authorize_account", return_value=authorized
-        ), patch(
+        ) as auth_mock, patch(
             "main.upsert_authenticated_account", return_value=account
         ) as upsert_mock:
             code = main(["auth", "/tmp/client.json"])
         self.assertEqual(code, 0)
+        self.assertEqual(auth_mock.call_args.args[1], ["https://www.googleapis.com/auth/calendar.events", "https://www.googleapis.com/auth/userinfo.email", "openid"])
         self.assertEqual(upsert_mock.call_args.args[2], "+05:30")
 
     def test_help_is_human_friendly(self) -> None:
@@ -125,8 +135,9 @@ class MainTests(unittest.TestCase):
         self.assertIn("Google Calendar event CLI", output)
         self.assertIn("features:", output)
         self.assertIn("create an event, invite attendees, and request a Google Meet link", output)
-        self.assertIn("# <preset> ls <number_of_events_to_list> | ls -nr <number_of_non_recurring_events_to_list> | ls -h <number_of_historic_events_to_list>", output)
-        self.assertIn("gcal 1 ls -nr 5", output)
+        self.assertIn("# <preset> ls <count> | ls -a <count> | ls -r <count> | ls -h <count>", output)
+        self.assertIn("gcal 1 ls -a 5", output)
+        self.assertIn("gcal 1 ls -r 5", output)
         self.assertIn("gcal 1 ls -h 5", output)
         self.assertIn("gcal 1 tr abc123", output)
         self.assertNotIn("commands:", output)
