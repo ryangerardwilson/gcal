@@ -1,6 +1,6 @@
 # gcal
 
-Google Calendar CLI for creating, listing, deleting, and rescheduling events across multiple Google account presets.
+Google Calendar CLI for creating, listing, deleting, rescheduling, and exporting transcript artifacts for events across multiple Google account presets.
 
 ## Install
 
@@ -88,8 +88,10 @@ gcal auth <client_secret_path>
 gcal <preset> "<title>" "<start>" "<end>" "<invitees_csv>"
 gcal <preset> ls <count>
 gcal <preset> ls -nr <count>
+gcal <preset> ls -h <count>
 gcal <preset> d <event_id>
 gcal <preset> r <event_id> "<start>" "<end>"
+gcal <preset> tr <event_id>
 ```
 
 Behavior notes:
@@ -97,6 +99,8 @@ Behavior notes:
 - `gcal auth <client_secret_path>` completes OAuth, discovers the authorized account email, stores the token under the XDG data path, and prints the assigned preset.
 - During `auth`, you can enter either an IANA timezone like `Asia/Kolkata` or a raw offset like `+0530`.
 - `gcal <preset> ls -nr <count>` lists only non-recurring events.
+- `gcal <preset> ls -h <count>` lists the most recent historical events, printed oldest-to-newest.
+- `gcal <preset> tr <event_id>` exports a Google Meet transcript attachment for that event into `~/.local/share/gcal/transcripts/` when one is available and accessible to the authorized account.
 - `gcal -u` delegates to the installer and exits without reinstalling when the latest release is already installed.
 
 Examples:
@@ -107,8 +111,10 @@ python main.py 1 "1:1 with Silvia" "2026-03-10 14:00:00" "2026-03-10 15:00:00" "
 python main.py 1 "Hiring screen" "2026-03-11 10:00:00" "2026-03-11 10:45:00" "a@example.com,b@example.com"
 python main.py 1 ls 5
 python main.py 1 ls -nr 5
+python main.py 1 ls -h 5
 python main.py 1 d abc123def456
 python main.py 1 r abc123def456 "2026-03-12 11:00:00" "2026-03-12 11:45:00"
+python main.py 1 tr abc123def456
 ```
 
 Output notes:
@@ -120,6 +126,7 @@ Output notes:
 ## External dependencies
 
 - Google Calendar API enabled on the OAuth project
+- Google Drive API enabled on the OAuth project for transcript exports
 
 ## Manual test checklist
 
@@ -128,5 +135,7 @@ Output notes:
 3. Confirm the attendee receives the invite email.
 4. Confirm the returned Meet URL opens correctly.
 5. Run `python main.py 1 ls 5` and verify the event appears with the same URL and time.
-6. Reschedule the event and verify the time changes.
-7. Delete the event and verify it disappears from Google Calendar.
+6. Run `python main.py 1 ls -h 5` and verify recent past events are shown oldest-to-newest.
+7. Run `python main.py 1 tr <event_id>` for a meeting with transcription enabled and verify a text file is written under the XDG data directory.
+8. Reschedule the event and verify the time changes.
+9. Delete the event and verify it disappears from Google Calendar.

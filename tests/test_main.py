@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 from gcal_cli.config import AccountConfig, AppConfig
 from gcal_cli.errors import UsageError
-from main import main
+from main import _format_event_time, main
 
 
 class MainTests(unittest.TestCase):
@@ -48,6 +48,14 @@ class MainTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(list_mock.call_args.kwargs["include_recurring"], False)
 
+    def test_list_history_command(self) -> None:
+        with patch("main.load_config", return_value=self._config()), patch(
+            "gcal_cli.auth.build_calendar_service", return_value=MagicMock()
+        ), patch("gcal_cli.calendar_api.list_historical_events", return_value=[]) as list_mock:
+            code = main(["1", "ls", "-h", "5"])
+        self.assertEqual(code, 0)
+        list_mock.assert_called_once_with(unittest.mock.ANY, 5, include_recurring=True)
+
     def test_delete_command(self) -> None:
         with patch("main.load_config", return_value=self._config()), patch(
             "gcal_cli.auth.build_calendar_service", return_value=MagicMock()
@@ -66,6 +74,25 @@ class MainTests(unittest.TestCase):
             code = main(["1", "r", "evt1", "2026-03-11 10:00:00", "2026-03-11 11:00:00"])
         self.assertEqual(code, 0)
         reschedule_mock.assert_called_once()
+
+    def test_transcript_command(self) -> None:
+        with patch("main.load_config", return_value=self._config()), patch(
+            "gcal_cli.auth.build_calendar_service", return_value=MagicMock()
+        ), patch("gcal_cli.auth.build_drive_service", return_value=MagicMock()), patch(
+            "gcal_cli.calendar_api.get_event",
+            return_value={"id": "evt1", "summary": "Meeting", "start": {"dateTime": "2026-03-10T14:00:00+05:30"}},
+        ), patch(
+            "gcal_cli.transcripts.find_transcript_attachment",
+            return_value=MagicMock(file_id="file1"),
+        ), patch(
+            "gcal_cli.transcripts.export_transcript_text",
+            return_value="hello",
+        ), patch(
+            "gcal_cli.transcripts.save_transcript",
+            return_value=Path("/tmp/transcript.txt"),
+        ):
+            code = main(["1", "tr", "evt1"])
+        self.assertEqual(code, 0)
 
     def test_ls_requires_count(self) -> None:
         with patch("main.load_config", return_value=self._config()), patch(
@@ -98,7 +125,12 @@ class MainTests(unittest.TestCase):
         self.assertIn("Google Calendar event CLI", output)
         self.assertIn("features:", output)
         self.assertIn("create an event, invite attendees, and request a Google Meet link", output)
-        self.assertIn("# <preset> ls <number_of_events_to_list> | ls -nr <number_of_non_recurring_events_to_list>", output)
+        self.assertIn("# <preset> ls <number_of_events_to_list> | ls -nr <number_of_non_recurring_events_to_list> | ls -h <number_of_historic_events_to_list>", output)
         self.assertIn("gcal 1 ls -nr 5", output)
+        self.assertIn("gcal 1 ls -h 5", output)
+        self.assertIn("gcal 1 tr abc123", output)
         self.assertNotIn("commands:", output)
         self.assertNotIn("usage:", output)
+
+    def test_format_event_time_handles_date_only_values(self) -> None:
+        self.assertEqual(_format_event_time("2026-03-10", "2026-03-11", "UTC"), "2026-03-10 -> 2026-03-11")

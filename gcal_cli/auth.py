@@ -9,6 +9,7 @@ from .paths import ensure_dirs
 
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/drive.meet.readonly",
     "https://www.googleapis.com/auth/userinfo.email",
     "openid",
 ]
@@ -46,6 +47,8 @@ def load_credentials(account: AccountConfig):
     credentials = None
     if token_path.exists():
         credentials = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+    if credentials and not credentials.has_scopes(SCOPES):
+        credentials = None
     if credentials and credentials.valid:
         return credentials
     if credentials and credentials.expired and credentials.refresh_token:
@@ -67,3 +70,10 @@ def build_calendar_service(account: AccountConfig):
 
     credentials = load_credentials(account)
     return build("calendar", "v3", credentials=credentials, cache_discovery=False)
+
+
+def build_drive_service(account: AccountConfig):
+    from googleapiclient.discovery import build
+
+    credentials = load_credentials(account)
+    return build("drive", "v3", credentials=credentials, cache_discovery=False)

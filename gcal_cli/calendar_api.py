@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -21,6 +22,17 @@ class CalendarEvent:
     end: str
     attendees: list[str]
     meeting_url: str
+
+
+def _calendar_event_from_item(item: dict) -> CalendarEvent:
+    return CalendarEvent(
+        event_id=str(item.get("id", "")),
+        title=str(item.get("summary", "(untitled)")),
+        start=str(item.get("start", {}).get("dateTime") or item.get("start", {}).get("date", "")),
+        end=str(item.get("end", {}).get("dateTime") or item.get("end", {}).get("date", "")),
+        attendees=extract_attendees(item),
+        meeting_url=extract_meeting_url(item),
+    )
 
 
 def extract_meeting_url(event: dict) -> str:
@@ -103,17 +115,41 @@ def list_upcoming_events(service, count: int, include_recurring: bool = True) ->
     for item in payload.get("items", []) or []:
         if not include_recurring and _is_recurring_event(item):
             continue
-        events.append(
-            CalendarEvent(
-                event_id=str(item.get("id", "")),
-                title=str(item.get("summary", "(untitled)")),
-                start=str(item.get("start", {}).get("dateTime") or item.get("start", {}).get("date", "")),
-                end=str(item.get("end", {}).get("dateTime") or item.get("end", {}).get("date", "")),
-                attendees=extract_attendees(item),
-                meeting_url=extract_meeting_url(item),
-            )
-        )
+        events.append(_calendar_event_from_item(item))
     return events
+
+
+def list_historical_events(service, count: int, include_recurring: bool = True) -> list[CalendarEvent]:
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    events: deque[CalendarEvent] = deque(maxlen=count)
+    page_token = None
+    while True:
+        try:
+            payload = service.events().list(
+                calendarId="primary",
+                timeMax=now,
+                maxResults=min(max(count, 1), 250),
+                singleEvents=True,
+                orderBy="startTime",
+                pageToken=page_token,
+            ).execute()
+        except HttpError as exc:
+            raise ApiError(f"Calendar history failed: {exc}") from exc
+        for item in payload.get("items", []) or []:
+            if not include_recurring and _is_recurring_event(item):
+                continue
+            events.append(_calendar_event_from_item(item))
+        page_token = payload.get("nextPageToken")
+        if not page_token:
+            break
+    return list(events)
+
+
+def get_event(service, event_id: str) -> dict:
+    try:
+        return service.events().get(calendarId="primary", eventId=event_id).execute()
+    except HttpError as exc:
+        raise ApiError(f"Calendar get failed: {exc}") from exc
 
 
 def delete_event(service, event_id: str) -> None:

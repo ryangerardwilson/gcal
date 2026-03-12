@@ -26,8 +26,12 @@ def tokens_dir() -> Path:
     return data_dir() / "tokens"
 
 
+def transcripts_dir() -> Path:
+    return data_dir() / "transcripts"
+
+
 def ensure_dirs() -> None:
-    for directory in (config_dir(), data_dir(), tokens_dir()):
+    for directory in (config_dir(), data_dir(), tokens_dir(), transcripts_dir()):
         directory.mkdir(parents=True, exist_ok=True)
         try:
             directory.chmod(0o700)

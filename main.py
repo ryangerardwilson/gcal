@@ -67,9 +67,14 @@ def _print_help() -> None:
         '  gcal 1 "Interview" "2026-03-10 14:00:00" "2026-03-10 15:00:00" "a@x.com,b@y.com"',
         "",
         "  list upcoming events, or only one-off events",
-        "  # <preset> ls <number_of_events_to_list> | ls -nr <number_of_non_recurring_events_to_list>",
+        "  # <preset> ls <number_of_events_to_list> | ls -nr <number_of_non_recurring_events_to_list> | ls -h <number_of_historic_events_to_list>",
         "  gcal 1 ls 5",
         "  gcal 1 ls -nr 5",
+        "  gcal 1 ls -h 5",
+        "",
+        "  export a transcript attachment for a past Google Meet event",
+        "  # <preset> tr <event_id>",
+        "  gcal 1 tr abc123",
         "",
         "  delete or reschedule an existing event",
         '  # <preset> d <event_id> | r <event_id> "<start>" "<end>"',
@@ -95,6 +100,8 @@ def _parse_invitees(value: str) -> list[str]:
 
 
 def _format_event_time(start_iso: str, end_iso: str, timezone: str) -> str:
+    if "T" not in start_iso or "T" not in end_iso:
+        return f"{start_iso} -> {end_iso}"
     tzinfo = timezone_info(timezone)
     start = datetime.fromisoformat(start_iso).astimezone(tzinfo)
     end = datetime.fromisoformat(end_iso).astimezone(tzinfo)
@@ -173,6 +180,40 @@ def _print_events(events, timezone: str) -> int:
     return 0
 
 
+def _parse_ls_params(params: list[str]) -> tuple[int, bool, bool]:
+    include_recurring = True
+    historical = False
+    remaining = list(params)
+    while remaining and remaining[0].startswith("-"):
+        flag = remaining.pop(0)
+        if flag == "-nr":
+            include_recurring = False
+            continue
+        if flag == "-h":
+            historical = True
+            continue
+        raise UsageError(
+            "usage: gcal <preset> ls <count>\n"
+            "       gcal <preset> ls -nr <count>\n"
+            "       gcal <preset> ls -h <count>\n"
+            "       gcal <preset> ls -h -nr <count>"
+        )
+    if len(remaining) != 1:
+        raise UsageError(
+            "usage: gcal <preset> ls <count>\n"
+            "       gcal <preset> ls -nr <count>\n"
+            "       gcal <preset> ls -h <count>\n"
+            "       gcal <preset> ls -h -nr <count>"
+        )
+    try:
+        count = int(remaining[0])
+    except ValueError as exc:
+        raise UsageError("count must be a positive integer") from exc
+    if count <= 0:
+        raise UsageError("count must be > 0")
+    return count, include_recurring, historical
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
@@ -203,28 +244,39 @@ def main(argv: list[str] | None = None) -> int:
     config = load_config()
     account = get_account(config, args.preset)
     from gcal_cli.auth import build_calendar_service
-    from gcal_cli.calendar_api import create_event, delete_event, list_upcoming_events, reschedule_event
+    from gcal_cli.calendar_api import create_event, delete_event, get_event, list_historical_events, list_upcoming_events, reschedule_event
 
     service = build_calendar_service(account)
     if args.command == "ls":
-        include_recurring = True
-        if args.params[:1] == ["-nr"]:
-            include_recurring = False
-            params = args.params[1:]
-        else:
-            params = args.params
-        if len(params) != 1:
-            raise UsageError("usage: gcal <preset> ls <count>\n       gcal <preset> ls -nr <count>")
-        try:
-            count = int(params[0])
-        except ValueError as exc:
-            raise UsageError("count must be a positive integer") from exc
-        if count <= 0:
-            raise UsageError("count must be > 0")
+        count, include_recurring, historical = _parse_ls_params(args.params)
+        events = (
+            list_historical_events(service, count, include_recurring=include_recurring)
+            if historical
+            else list_upcoming_events(service, count, include_recurring=include_recurring)
+        )
         return _print_events(
-            list_upcoming_events(service, count, include_recurring=include_recurring),
+            events,
             config.timezone,
         )
+    if args.command == "tr":
+        if len(args.params) != 1:
+            raise UsageError("usage: gcal <preset> tr <event_id>")
+        from gcal_cli.auth import build_drive_service
+        from gcal_cli.transcripts import export_transcript_text, find_transcript_attachment, save_transcript
+
+        drive_service = build_drive_service(account)
+        event = get_event(service, args.params[0])
+        attachment = find_transcript_attachment(event)
+        text = export_transcript_text(drive_service, attachment.file_id)
+        output_path = save_transcript(
+            text,
+            event_id=str(event.get("id", "")),
+            title=str(event.get("summary", "(untitled)")),
+            start_value=str(event.get("start", {}).get("dateTime") or event.get("start", {}).get("date", "")),
+        )
+        print(f"saved transcript\tevent_id={event.get('id', '')}\tfile_id={attachment.file_id}")
+        print(output_path)
+        return 0
     if args.command == "d":
         if len(args.params) != 1:
             raise UsageError("usage: gcal <preset> d <event_id>")

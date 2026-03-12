@@ -6,10 +6,10 @@
 - This file only records `gcal`-specific constraints or durable deviations.
 
 ## Mission
-Implement a small multi-preset Google Calendar CLI for creating, listing, deleting, and rescheduling events.
+Implement a small multi-preset Google Calendar CLI for creating, listing, deleting, rescheduling, and exporting transcript artifacts for calendar events.
 
 ## Product boundaries
-- Scope is Google Calendar event management only.
+- Scope is Google Calendar event management plus retrieval of transcript artifacts already attached to events.
 - The app should stay small and task-focused.
 - Primary happy path is creating a calendar event with attendees and a Google Meet link.
 - Multi-account support is required through numeric presets.
@@ -20,8 +20,10 @@ Implement a small multi-preset Google Calendar CLI for creating, listing, deleti
 - Preset-scoped commands:
   - `python main.py <preset> "<title>" "<start>" "<end>" "<invitees_csv>"`
   - `python main.py <preset> ls <count>`
+  - `python main.py <preset> ls -h <count>`
   - `python main.py <preset> d <event_id>`
   - `python main.py <preset> r <event_id> "<start>" "<end>"`
+  - `python main.py <preset> tr <event_id>`
 - Keep output plain-text, deterministic, and easy to scan.
 
 ## Architecture expectations
@@ -34,9 +36,10 @@ Implement a small multi-preset Google Calendar CLI for creating, listing, deleti
 
 ## Implementation rules
 - Python 3.11+.
-- Use the Google Calendar API and installed-app OAuth flow.
+- Use the Google Calendar API, Google Drive API for transcript export, and installed-app OAuth flow.
 - Create events on the primary calendar.
 - Event creation must request a Google Meet link and send attendee invites.
+- Transcript export should only retrieve existing transcript artifacts; it should not attempt live meeting capture or third-party transcription.
 - Reschedule should preserve the event and update only its times.
 - Delete should send attendee updates.
 
@@ -44,5 +47,7 @@ Implement a small multi-preset Google Calendar CLI for creating, listing, deleti
 - A user can auth one or more presets.
 - A user can create an event with attendees and receive a Meet link.
 - `ls` shows upcoming events with event id, time, and Meet URL.
+- `ls -h` shows recent past events in chronological order.
+- A user can export an event transcript when Google has attached one to the event and the account can access it.
 - A user can delete and reschedule an event by event id.
 - Config and token paths are XDG-compliant.

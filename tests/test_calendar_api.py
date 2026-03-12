@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from gcal_cli.calendar_api import create_event, extract_attendees, extract_meeting_url, list_upcoming_events
+from gcal_cli.calendar_api import create_event, extract_attendees, extract_meeting_url, get_event, list_historical_events, list_upcoming_events
 
 
 class CalendarApiTests(unittest.TestCase):
@@ -74,3 +74,31 @@ class CalendarApiTests(unittest.TestCase):
         events = list_upcoming_events(service, 5, include_recurring=False)
         self.assertEqual([event.event_id for event in events], ["evt1"])
         self.assertEqual(events[0].attendees, ["solo@example.com"])
+
+    def test_list_historical_events_keeps_most_recent_tail_in_ascending_order(self) -> None:
+        service = MagicMock()
+        service.events.return_value.list.return_value.execute.side_effect = [
+            {
+                "items": [
+                    {"id": "evt1", "summary": "Oldest", "start": {"dateTime": "2026-03-01T10:00:00+05:30"}, "end": {"dateTime": "2026-03-01T11:00:00+05:30"}},
+                    {"id": "evt2", "summary": "Middle", "start": {"dateTime": "2026-03-02T10:00:00+05:30"}, "end": {"dateTime": "2026-03-02T11:00:00+05:30"}},
+                ],
+                "nextPageToken": "page-2",
+            },
+            {
+                "items": [
+                    {"id": "evt3", "summary": "Recent", "start": {"dateTime": "2026-03-03T10:00:00+05:30"}, "end": {"dateTime": "2026-03-03T11:00:00+05:30"}},
+                ]
+            },
+        ]
+        events = list_historical_events(service, 2)
+        self.assertEqual([event.event_id for event in events], ["evt2", "evt3"])
+
+    def test_get_event_returns_payload(self) -> None:
+        service = MagicMock()
+        service.events.return_value.get.return_value.execute.return_value = {"id": "evt1", "summary": "Meeting"}
+        event = get_event(service, "evt1")
+        self.assertEqual(event["id"], "evt1")
+        kwargs = service.events.return_value.get.call_args.kwargs
+        self.assertEqual(kwargs["calendarId"], "primary")
+        self.assertEqual(kwargs["eventId"], "evt1")
