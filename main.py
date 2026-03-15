@@ -283,7 +283,3 @@ if __name__ == "__main__":
     except GcalError as exc:
         print(exc.message, file=sys.stderr)
         raise SystemExit(exc.exit_code)
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.strip() or exc.stdout.strip() or str(exc)
-        print(f"subprocess failed: {message}", file=sys.stderr)
-        raise SystemExit(2)
