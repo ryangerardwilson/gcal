@@ -2,3 +2,4 @@ google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 charset-normalizer
+rgw-cli-contract==0.1.1

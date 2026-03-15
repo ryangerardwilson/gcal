@@ -66,6 +66,7 @@ jobs:
               "$PYBIN" -m PyInstaller --clean --onedir --name gcal \
                 --collect-all charset_normalizer \
                 main.py
+              cp install.sh dist/gcal/
 
               tar -C dist -czf gcal-linux-x64.tar.gz gcal
             '

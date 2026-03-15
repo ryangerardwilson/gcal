@@ -4,11 +4,7 @@ import argparse
 from datetime import datetime
 import os
 from pathlib import Path
-import shutil
-import shlex
-import subprocess
 import sys
-import tempfile
 from zoneinfo import ZoneInfo
 
 from _version import __version__
@@ -21,9 +17,34 @@ from gcal_cli.config import (
     validate_timezone,
 )
 from gcal_cli.errors import ApiError, ConfigError, GcalError, UsageError
+from rgw_cli_contract import AppSpec, resolve_install_script_path, run_app
 
 ANSI_RESET = "\033[0m"
 ANSI_GRAY = "\033[38;5;245m"
+INSTALL_SCRIPT = resolve_install_script_path(__file__)
+HELP_TEXT = """gcal
+
+flags:
+  gcal -h
+    show this help
+  gcal -v
+    print the installed version
+  gcal -u
+    upgrade to the latest release
+  gcal conf
+    open the config in your editor
+
+features:
+  authorize a Google account and save or refresh its preset
+  # gcal auth <client_secret_path>
+  gcal auth ~/Documents/credentials/client_secret.json
+
+  create, list, delete, reschedule, and export events
+  # gcal <preset> ls 5 | gcal <preset> d <event_id> | gcal <preset> r <event_id> "<start>" "<end>"
+  gcal 1 ls 5
+  gcal 1 d abc123
+  gcal 1 r abc123 "2026-03-11 10:00:00" "2026-03-11 11:00:00"
+"""
 
 
 def _muted_text(text: str) -> str:
@@ -44,45 +65,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _print_help() -> None:
-    lines = [
-        "Google Calendar event CLI",
-        "",
-        "flags:",
-        "  gcal -h",
-        "    show this help",
-        "  gcal -v",
-        "    print the installed version",
-        "  gcal -u",
-        "    upgrade to the latest release",
-        "  gcal conf",
-        "    open the config in your editor",
-        "",
-        "features:",
-        "  authorize a Google account and save or refresh its preset",
-        "  # auth <client_secret_path>",
-        "  gcal auth ~/Documents/credentials/client_secret.json",
-        "",
-        "  create an event, invite attendees, and request a Google Meet link",
-        '  # <preset> "<title>" "<start>" "<end>" "<invitees_csv>"',
-        '  gcal 1 "Interview" "2026-03-10 14:00:00" "2026-03-10 15:00:00" "a@x.com,b@y.com"',
-        "",
-        "  list non-recurring events by default, or switch to all / recurring-only",
-        "  # <preset> ls <count> | ls -a <count> | ls -r <count> | ls -h <count>",
-        "  gcal 1 ls 5",
-        "  gcal 1 ls -a 5",
-        "  gcal 1 ls -r 5",
-        "  gcal 1 ls -h 5",
-        "",
-        "  export a transcript attachment for a past Google Meet event",
-        "  # <preset> tr <event_id>",
-        "  gcal 1 tr abc123",
-        "",
-        "  delete or reschedule an existing event",
-        '  # <preset> d <event_id> | r <event_id> "<start>" "<end>"',
-        "  gcal 1 d abc123",
-        '  gcal 1 r abc123 "2026-03-11 10:00:00" "2026-03-11 11:00:00"',
-    ]
-    print(_muted_text("\n".join(lines)))
+    print(_muted_text(HELP_TEXT))
 
 
 def _parse_time(value: str, timezone: str) -> datetime:
@@ -123,36 +106,6 @@ def _handle_auth(params: list[str]) -> int:
     account = upsert_authenticated_account(client_secret, authorized.email, timezone)
     print(f"authorized\t{account.preset}\t{account.email}\t{timezone}")
     return 0
-
-
-def _upgrade_to_latest() -> int:
-    curl = shutil.which("curl")
-    bash = shutil.which("bash")
-    if not curl or not bash:
-        raise UsageError("curl and bash are required for -u")
-    url = "https://raw.githubusercontent.com/ryangerardwilson/gcal/main/install.sh"
-    with tempfile.NamedTemporaryFile(suffix=".sh", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-    try:
-        fetch = subprocess.run([curl, "-fsSL", url, "-o", str(tmp_path)], check=False)
-        if fetch.returncode != 0:
-            return fetch.returncode
-        run = subprocess.run([bash, str(tmp_path), "-u"], check=False)
-        return run.returncode
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
-
-def _open_config_in_editor() -> int:
-    cfg_path = resolve_config_path()
-    cfg_path.parent.mkdir(parents=True, exist_ok=True)
-    if not cfg_path.exists():
-        cfg_path.write_text('{"defaults":{"timezone":"UTC"},"accounts":{}}\n', encoding="utf-8")
-    editor = (os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim").strip()
-    editor_cmd = shlex.split(editor) if editor else ["vim"]
-    if not editor_cmd:
-        editor_cmd = ["vim"]
-    return subprocess.run([*editor_cmd, str(cfg_path)], check=False).returncode
 
 
 def _print_events(events, timezone: str) -> int:
@@ -222,27 +175,25 @@ def _parse_ls_params(params: list[str]) -> tuple[int, str, bool]:
     return count, recurrence_mode, historical
 
 
-def main(argv: list[str] | None = None) -> int:
+APP_SPEC = AppSpec(
+    app_name="gcal",
+    version=__version__,
+    help_text=HELP_TEXT,
+    install_script_path=INSTALL_SCRIPT,
+    no_args_mode="help",
+    config_path_factory=resolve_config_path,
+    config_bootstrap_text='{"defaults":{"timezone":"UTC"},"accounts":{}}\n',
+)
+
+
+def _dispatch(argv: list[str]) -> int:
     argv = sys.argv[1:] if argv is None else argv
-    if not argv:
-        _print_help()
-        return 0
     parser = _build_parser()
     args = parser.parse_args(argv)
-    if args.help:
-        _print_help()
-        return 0
-    if args.version:
-        print(__version__)
-        return 0
-    if args.upgrade:
-        if args.preset or args.command or args.params:
-            raise UsageError("usage: gcal -u")
-        return _upgrade_to_latest()
     if args.preset == "conf":
         if args.command or args.params:
             raise UsageError("usage: gcal conf")
-        return _open_config_in_editor()
+        raise UsageError("use `gcal conf` with no extra args")
     if args.preset == "auth":
         if args.command is None or args.params:
             raise UsageError("usage: gcal auth <client_secret_path>")
@@ -319,6 +270,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"created\tevent_id={event.event_id}")
     print(event.meeting_url)
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    return run_app(APP_SPEC, args, _dispatch)
 
 
 if __name__ == "__main__":
